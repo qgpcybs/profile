@@ -168,9 +168,9 @@ const DeepSea = () => {
 
     console.log("创建气泡");
 
-    // 气泡数量 - 初始阶段更多气泡
-    const bubbleCount = 150; // 增加气泡数量，使初始效果更密集
-    
+    // 气泡数量 - 初始阶段大量气泡溢满屏幕
+    const bubbleCount = 300; // 大幅增加气泡数量，使初始效果更加密集
+
     // 记录开始时间
     startTimeRef.current = performance.now() * 0.001;
 
@@ -209,20 +209,20 @@ const DeepSea = () => {
       varying vec3 vNormal;
       
       void main() {
-        // 基础气泡颜色 - 明亮的蓝色
-        vec3 bubbleColor = vec3(0.5, 0.8, 1.0);
+        // 基础气泡颜色 - 淡蓝色，更接近真实气泡
+        vec3 bubbleColor = vec3(0.3, 0.6, 0.9);
         
-        // 边缘效果
-        float fresnel = pow(1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+        // 边缘效果 - 增强边缘效果使气泡更真实
+        float fresnel = pow(1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
         
-        // 彩虹效果
-        vec3 rainbow = 0.5 + 0.5 * cos(time * 0.5 + vUv.xyx * 3.0 + vec3(0, 2, 4));
+        // 减少彩虹效果，使气泡更自然
+        vec3 rainbow = 0.5 + 0.5 * cos(time * 0.3 + vUv.xyx * 2.0 + vec3(0, 2, 4));
         
-        // 最终颜色
-        vec3 finalColor = mix(bubbleColor, rainbow, 0.3) + fresnel * 0.5;
+        // 最终颜色 - 减少彩虹混合比例
+        vec3 finalColor = mix(bubbleColor, rainbow, 0.1) + fresnel * 0.3;
         
-        // 透明度 - 增加不透明度
-        float alpha = 0.9 - fresnel * 0.2;
+        // 透明度 - 大幅增加透明度，使气泡更像真实气泡
+        float alpha = 0.4 - fresnel * 0.2;
         
         gl_FragColor = vec4(finalColor, alpha);
       }
@@ -266,18 +266,18 @@ const DeepSea = () => {
       bubble.position.z = Math.random() * 5 - 2.5;
 
       // 随机速度 - 初始阶段更快
-      bubble.userData.initialSpeed = Math.random() * 0.08 + 0.04; // 初始速度更快
-      bubble.userData.finalSpeed = Math.random() * 0.02 + 0.005; // 最终速度更慢
+      bubble.userData.initialSpeed = Math.random() * 0.3 + 0.04; // 初始速度更快
+      bubble.userData.finalSpeed = Math.random() * 0.16 + 0.04; // 最终速度更慢
       bubble.userData.speed = bubble.userData.initialSpeed; // 当前速度
-      
-      bubble.userData.initialWobbleSpeed = Math.random() * 0.05 + 0.02; // 初始摆动速度更快
-      bubble.userData.finalWobbleSpeed = Math.random() * 0.01 + 0.005; // 最终摆动速度更慢
+
+      bubble.userData.initialWobbleSpeed = Math.random() * 0.02 + 0.01; // 初始摆动速度更快
+      bubble.userData.finalWobbleSpeed = Math.random() * 0.02 + 0.01; // 最终摆动速度更慢
       bubble.userData.wobbleSpeed = bubble.userData.initialWobbleSpeed; // 当前摆动速度
-      
-      bubble.userData.initialWobbleAmount = Math.random() * 0.4 + 0.2; // 初始摆动幅度更大
-      bubble.userData.finalWobbleAmount = Math.random() * 0.1 + 0.05; // 最终摆动幅度更小
+
+      bubble.userData.initialWobbleAmount = Math.random() * 0.2 + 0.1; // 初始摆动幅度更大
+      bubble.userData.finalWobbleAmount = Math.random() * 0.2 + 0.1; // 最终摆动幅度更小
       bubble.userData.wobbleAmount = bubble.userData.initialWobbleAmount; // 当前摆动幅度
-      
+
       // 标记为活跃状态
       bubble.userData.active = true;
 
@@ -298,7 +298,7 @@ const DeepSea = () => {
     const time = performance.now() * 0.001;
     // 不再需要计算elapsedTime，因为我们在transitionToDeepSea的onComplete中调用了transitionToSlowBubbles
     // const elapsedTime = time - startTimeRef.current;
-    
+
     // 检查是否过了3秒，如果是，开始过渡到慢速状态
     // 注释掉这部分，因为我们已经在transitionToDeepSea的onComplete中调用了transitionToSlowBubbles
     // if (elapsedTime >= 3 && !transitionCompleteRef.current) {
@@ -313,7 +313,7 @@ const DeepSea = () => {
     // 更新气泡位置和形状
     bubblesRef.current.forEach((bubble) => {
       if (!bubble.userData.active) return; // 跳过非活跃气泡
-      
+
       // 上升
       bubble.position.y += bubble.userData.speed;
 
@@ -323,16 +323,10 @@ const DeepSea = () => {
         bubble.userData.wobbleAmount *
         0.01;
 
-      // 如果气泡超出屏幕顶部，重置到底部
-      if (bubble.position.y > 5) {
-        bubble.position.y = -5 - Math.random() * 5;
-        bubble.position.x = (Math.random() - 0.5) * 10;
-        
-        // 如果已经过渡完成，有一定概率不再显示气泡（使气泡变得稀疏）
-        if (transitionCompleteRef.current && Math.random() > 0.7) {
-          bubble.userData.active = false;
-          bubble.visible = false;
-        }
+      // 删掉超出屏幕的泡泡
+      if (bubble.position.y > 50) {
+        bubble.userData.active = false;
+        bubble.visible = false;
       }
 
       // 更新着色器时间 - 使用存储在userData中的uniforms引用
@@ -347,23 +341,28 @@ const DeepSea = () => {
     // 继续动画循环
     animationFrameRef.current = requestAnimationFrame(animate);
   };
-  
+
   // 过渡到慢速气泡状态
   const transitionToSlowBubbles = () => {
     if (transitionCompleteRef.current) return;
     transitionCompleteRef.current = true;
-    
+
     console.log("过渡到慢速气泡状态");
-    
+
     // 为每个气泡创建过渡动画
     bubblesRef.current.forEach((bubble) => {
-      // 使用GSAP创建平滑过渡
-      gsap.to(bubble.userData, {
-        speed: bubble.userData.finalSpeed,
-        wobbleSpeed: bubble.userData.finalWobbleSpeed,
-        wobbleAmount: bubble.userData.finalWobbleAmount,
-        duration: 1.5,
-        ease: "power2.inOut"
+      // 只对屏幕内的气泡应用缩小效果
+      // 使用GSAP创建缩小消失的动画
+      gsap.to(bubble.scale, {
+        x: 0,
+        y: 0,
+        z: 0,
+        duration: 2,
+        ease: "power2.out",
+        onComplete: () => {
+          bubble.userData.active = false;
+          bubble.visible = false;
+        },
       });
     });
   };
@@ -390,19 +389,24 @@ const DeepSea = () => {
   const transitionToDeepSea = () => {
     if (!sceneRef.current) return;
 
-    // 使用GSAP创建平滑过渡
+    // 使用GSAP创建平滑过渡 - 缩短到1秒
     gsap.to(sceneRef.current.background, {
-      duration: 3,
+      duration: 2, // 从3秒改为1秒
       r: 0.0,
       g: 0.02,
       b: 0.05,
       ease: "power2.inOut",
       onComplete: () => {
         console.log("Transition to deep sea complete");
-        // 在背景过渡完成后，触发气泡过渡
-        transitionToSlowBubbles();
       },
     });
+
+    // 首屏气泡渐隐
+    setTimeout(() => {
+      if (!transitionCompleteRef.current) {
+        transitionToSlowBubbles();
+      }
+    }, 1100);
   };
 
   // 组件挂载时初始化
