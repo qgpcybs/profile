@@ -403,6 +403,9 @@ const DeepSea = () => {
       }
     });
     
+    // 更新光线效果
+    updateSunbeams(time);
+    
     // 重置缓慢气泡的函数
     function resetSlowBubble(bubble: THREE.Mesh) {
       // 重置位置
@@ -809,6 +812,8 @@ const DeepSea = () => {
         console.log("Transition to deep sea complete");
         // 在背景过渡完成后创建缓慢上升的球形气泡
         createSlowBubbles();
+        // 创建自上而下的光芒效果
+        createSunbeams();
       },
     });
 
@@ -820,6 +825,169 @@ const DeepSea = () => {
     }, 1100);
   };
 
+  // 创建自上而下的光芒效果
+  const createSunbeams = () => {
+    if (!sceneRef.current) return;
+    
+    console.log("创建自上而下的光芒效果");
+    
+    // 光线数量
+    const beamCount = 8; // 间断型分布的光线数量
+    
+    // 光线顶点着色器
+    const beamVertexShader = `
+      uniform float time;
+      varying vec2 vUv;
+      
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+    
+    // 光线片段着色器
+    const beamFragmentShader = `
+      uniform float time;
+      varying vec2 vUv;
+      
+      // 噪声函数
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+      
+      // 简化的柏林噪声
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f); // 平滑插值
+        
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+      }
+      
+      // FBM (分形布朗运动) - 用于创建更自然的噪声
+      float fbm(vec2 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        float frequency = 3.0;
+        
+        for (int i = 0; i < 5; i++) {
+          value += amplitude * noise(p * frequency);
+          amplitude *= 0.5;
+          frequency *= 2.0;
+        }
+        
+        return value;
+      }
+      
+      void main() {
+        // 基础光线颜色 - 淡蓝色
+        vec3 beamColor = vec3(0.6, 0.8, 1.0);
+        
+        // 使用噪声创建光线强度变化 - 降低频率使过渡更平滑
+        float noiseValue = fbm(vec2(vUv.x * 0.4, vUv.y * 0.5 + time * 0.05));
+        
+        // 光线强度随时间变化
+        float timeVariation = sin(time * 0.2 + vUv.y * 5.0) * 0.5 + 0.5;
+        
+        // 光线从上到下逐渐变淡
+        float bottomFadeStart = 0.25; 
+        float verticalFade = smoothstep(0.0, bottomFadeStart, vUv.y);
+        verticalFade = pow(verticalFade, 1.5);
+        
+        // 光线在水平方向上的衰减 - 使用更平滑的过渡减少线条感
+        // 使用更大的过渡区域
+        float horizontalFade = smoothstep(0.0, 0.4, vUv.x) * smoothstep(1.0, 0.6, vUv.x);
+        
+        // 添加一些随机的光线变化 - 降低影响使光线更柔和
+        float randomVariation = noise(vec2(vUv.y * 10.0 + time * 0.1, time * 0.2));
+        
+        // 组合所有效果
+        float intensity = verticalFade * horizontalFade * (noiseValue * 0.8 + 0.2) * (timeVariation * 0.2 + 0.8) * (randomVariation * 0.15 + 0.85);
+        
+        // 最终颜色和透明度
+        vec3 finalColor = beamColor * intensity;
+        float alpha = intensity * 0.2; // 降低整体透明度使效果更柔和
+        
+        gl_FragColor = vec4(finalColor, alpha);
+      }
+    `;
+    
+    // 光线材质
+    const beamUniforms = {
+      time: { value: 0.0 }
+    };
+    
+    // 使用着色器材质创建光线
+    const beamMaterial = new THREE.ShaderMaterial({
+      uniforms: beamUniforms,
+      vertexShader: beamVertexShader,
+      fragmentShader: beamFragmentShader,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    
+    // 创建多个光线平面，覆盖屏幕中间80%的区域
+    const totalWidth = 10; // 场景宽度
+    const usableWidth = totalWidth * 0.8; // 可用宽度（80%）
+    const startX = -usableWidth / 2; // 起始X坐标
+    const beamWidth = usableWidth / beamCount; // 每个光束的宽度
+    
+    for (let i = 0; i < beamCount; i++) {
+      // 随机宽度变化 - 增加宽度使光线更柔和
+      const width = beamWidth * (0.7 + Math.random() * 1.0);
+      
+      // 随机位置变化 - 但确保在中间80%区域内
+      const x = startX + (i + 0.5) * beamWidth + (Math.random() - 0.5) * beamWidth * 0.5;
+      
+      // 创建光线几何体 - 高度足够覆盖整个场景
+      const geometry = new THREE.PlaneGeometry(width, 15);
+      
+      // 创建光线网格
+      const material = beamMaterial.clone();
+      const beam = new THREE.Mesh(geometry, material);
+      
+      // 确保每个光线的材质都有自己的uniforms
+      if (material instanceof THREE.ShaderMaterial) {
+        beam.userData.uniforms = material.uniforms;
+      }
+      
+      // 设置位置 - 从上方照射下来
+      beam.position.set(x, 5, -1); // 放在气泡后面
+      
+      // 5度倾斜
+      const tiltAngle = 5 * Math.PI / 180;
+      beam.rotation.z = tiltAngle;
+      
+      // 添加到场景
+      sceneRef.current.add(beam);
+      
+      // 存储光线引用
+      if (!sceneRef.current.userData.sunbeams) {
+        sceneRef.current.userData.sunbeams = [];
+      }
+      sceneRef.current.userData.sunbeams.push(beam);
+    }
+  };
+  
+  // 在动画循环中更新光线效果
+  const updateSunbeams = (time: number) => {
+    if (!sceneRef.current || !sceneRef.current.userData.sunbeams) return;
+    
+    // 更新所有光线的时间参数
+    sceneRef.current.userData.sunbeams.forEach((beam: THREE.Mesh) => {
+      if (beam.userData.uniforms && beam.userData.uniforms.time) {
+        beam.userData.uniforms.time.value = time;
+      }
+    });
+  };
+  
   // 组件挂载时初始化
   useEffect(() => {
     const container = containerRef.current;
