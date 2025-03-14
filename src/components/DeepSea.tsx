@@ -321,7 +321,8 @@ const DeepSea = () => {
       // 重置位置
       bubble.position.y = -2.5;
       bubble.position.x = (Math.random() - 0.5) * 8;
-      bubble.position.z = Math.random() * 3 - 1.5;
+      // bubble.position.z = Math.random() * 3 - 1.5;
+      bubble.position.z = 0;
 
       // 重置大小
       bubble.scale.set(1, 1, 1);
@@ -439,7 +440,8 @@ const DeepSea = () => {
       // 随机位置 - 更均匀分布
       bubble.position.x = (Math.random() - 0.5) * 8;
       bubble.position.y = -2.5;
-      bubble.position.z = Math.random() * 3 - 1.5;
+      bubble.position.z = 0;
+      // bubble.position.z = Math.random() * 3 - 1.5;
 
       // 随机速度 - 非常缓慢上升
       bubble.userData.speed = Math.random() * 0.005 + 0.002;
@@ -529,7 +531,7 @@ const DeepSea = () => {
       // 随机方向 - 向外扩散
       const direction = new THREE.Vector3(
         (Math.random() - 0.5) * 2,
-        Math.random() * 0.5 + 0.5, // 偏向上方
+        Math.random() * 0.5 + 0.5,
         (Math.random() - 0.5) * 2
       ).normalize();
 
@@ -576,13 +578,18 @@ const DeepSea = () => {
 
     // 使用GSAP创建平滑过渡 - 缩短到1秒
     gsap.to(sceneRef.current.background, {
+      duration: 1.4,
+      onComplete: () => {
+        createSunbeams(); // 创建自上而下的光芒效果
+      },
+    });
+    gsap.to(sceneRef.current.background, {
       duration: 2, // 从3秒改为1秒
       r: 0.0,
       g: 0.02,
       b: 0.05,
       ease: "power2.inOut",
       onComplete: () => {
-        createSunbeams(); // 创建自上而下的光芒效果
         // 在背景过渡完成后创建缓慢上升的球形气泡
         createSlowBubbles();
       },
@@ -600,8 +607,6 @@ const DeepSea = () => {
   const createSunbeams = () => {
     if (!sceneRef.current) return;
 
-    console.log("创建自上而下的光芒效果");
-
     // 清除之前的光线
     if (sceneRef.current.userData.sunbeams) {
       sceneRef.current.userData.sunbeams.forEach((light: THREE.Object3D) => {
@@ -618,32 +623,32 @@ const DeepSea = () => {
 
     // 创建多个方向光，从不同角度照射
     const lightCount = 5; // 使用多个光源以增强效果
-    
+
     for (let i = 0; i < lightCount; i++) {
       // 创建方向光
       const directionalLight = new THREE.DirectionalLight(
-        0x80ccff, // 淡蓝色
-        0.3 // 较低的强度，避免过亮
+        0xffffff, // 淡蓝色
+        0.1 // 较低的强度，避免过亮
       );
-      
+
       // 计算光线角度 - 主要从上方照射，但有轻微的角度变化
-      const angleOffset = (i / lightCount) * Math.PI * 0.3 - Math.PI * 0.15; // -15度到+15度的范围
-      
+      const angleOffset = (i / lightCount) * Math.PI * 0.3;
+
       // 设置光线方向 - 从上方照射下来
       directionalLight.position.set(
         Math.sin(angleOffset) * 5, // X轴位置
         10, // Y轴位置（高处）
-        Math.cos(angleOffset) * 5 // Z轴位置
+       10 // Z轴位置
       );
-      
+
       // 设置目标位置
-      directionalLight.target.position.set(0, -5, 0);
-      
+      directionalLight.target.position.set(0, -5, 10);
+
       // 启用阴影
       directionalLight.castShadow = true;
       directionalLight.shadow.mapSize.width = 1024;
       directionalLight.shadow.mapSize.height = 1024;
-      
+
       // 设置阴影相机参数
       directionalLight.shadow.camera.near = 0.5;
       directionalLight.shadow.camera.far = 20;
@@ -651,24 +656,25 @@ const DeepSea = () => {
       directionalLight.shadow.camera.right = 10;
       directionalLight.shadow.camera.top = 10;
       directionalLight.shadow.camera.bottom = -10;
-      
+
       // 添加到场景
       sceneRef.current.add(directionalLight);
       sceneRef.current.add(directionalLight.target);
-      
+
       // 存储光线引用
-      sceneRef.current.userData.sunbeams = sceneRef.current.userData.sunbeams || [];
+      sceneRef.current.userData.sunbeams =
+        sceneRef.current.userData.sunbeams || [];
       sceneRef.current.userData.sunbeams.push(directionalLight);
     }
-    
+
     // 添加可视化的光线效果
     createLightBeams();
   };
-  
+
   // 创建可视化的光线效果
   const createLightBeams = () => {
     if (!sceneRef.current) return;
-    
+
     // 光线顶点着色器
     const beamVertexShader = `
       uniform float time;
@@ -679,7 +685,7 @@ const DeepSea = () => {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `;
-    
+
     // 光线片段着色器 - 创建柔和的光线效果
     const beamFragmentShader = `
       uniform float time;
@@ -720,18 +726,18 @@ const DeepSea = () => {
       }
       
       void main() {
-        // 基础光线颜色 - 淡蓝色
-        vec3 beamColor = vec3(0.6, 0.8, 1.0);
+        // 基础光线颜色 - 淡蓝色，增加亮度
+        vec3 beamColor = vec3(0.7, 0.9, 1.0);
         
         // 使用噪声创建光线强度变化
         float noiseValue = fbm(vec2(vUv.x * 0.4, vUv.y * 0.5 + time * 0.05));
         
         // 光线强度随时间变化
-        float timeVariation = sin(time * 0.2 + vUv.y * 5.0) * 0.5 + 0.5;
+        float timeVariation = sin(time * 1.0 + vUv.x * 5.0) * 0.5 + 0.5;
         
-        // 光线从上到下逐渐变淡
-        float verticalFade = smoothstep(0.0, 0.3, vUv.y);
-        verticalFade = pow(verticalFade, 1.5);
+        // 光线从上到下逐渐变淡 - 调整为更长的光束
+        float verticalFade = smoothstep(0.0, 0.6, vUv.y);
+        verticalFade = pow(verticalFade, 1.2); // 减小指数使光线更明显
         
         // 光线在水平方向上的衰减 - 使用更平滑的过渡减少线条感
         float horizontalFade = smoothstep(0.0, 0.4, vUv.x) * smoothstep(1.0, 0.6, vUv.x);
@@ -739,29 +745,35 @@ const DeepSea = () => {
         // 添加一些随机的光线变化
         float randomVariation = noise(vec2(vUv.y * 10.0 + time * 0.1, time * 0.2));
         
-        // 组合所有效果
-        float intensity = verticalFade * horizontalFade * (noiseValue * 0.8 + 0.2) * 
-                         (timeVariation * 0.2 + 0.8) * (randomVariation * 0.15 + 0.85);
+        // 组合所有效果 - 增加基础亮度
+        float intensity = verticalFade * horizontalFade * (noiseValue * 0.6 + 0.4) * 
+                         (timeVariation * 0.4 + 0.5) * (randomVariation * 0.15 + 0.85);
         
-        // 最终颜色和透明度
+        // 最终颜色和透明度 - 增加透明度
         vec3 finalColor = beamColor * intensity;
-        float alpha = intensity * 0.3; // 调整整体透明度
+        float alpha = intensity * 0.6; // 增加整体透明度
         
         gl_FragColor = vec4(finalColor, alpha);
       }
     `;
-    
+
     // 创建多个光束
-    const beamCount = 8;
+    const beamCount = 5;
     const totalWidth = 10;
-    const usableWidth = totalWidth * 0.8;
-    const startX = -usableWidth / 2;
-    const beamWidth = usableWidth / beamCount;
-    
+    const usableWidth = totalWidth * 0.6;
+    let startX = 0;
+    const beamWidth = usableWidth * 0.04;
+
     for (let i = 0; i < beamCount; i++) {
       // 随机位置变化
-      const x = startX + (i + 0.5) * beamWidth + (Math.random() - 0.5) * beamWidth * 0.5;
-      
+      if (i == 0) startX = -usableWidth / 2 - usableWidth * 0.05;
+      else if (i == 1) startX = -usableWidth / 2 + usableWidth * 0.11;
+      else if (i == 2) startX = -usableWidth / 2 + usableWidth * 0.4;
+      else if (i == 3) startX = -usableWidth / 2 + usableWidth * 0.55;
+      else startX = -usableWidth / 2 + usableWidth * 0.8;
+
+      const x = startX;
+
       // 创建光线材质
       const beamMaterial = new THREE.ShaderMaterial({
         uniforms: { time: { value: 0.0 } },
@@ -770,24 +782,38 @@ const DeepSea = () => {
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
       });
-      
-      // 创建光线几何体 - 使用平面
-      const width = beamWidth * (0.7 + Math.random() * 0.5);
-      const geometry = new THREE.PlaneGeometry(width, 15);
-      
+
+      // 创建光线几何体 - 使用平面，增加宽度
+      const width = beamWidth * (1.0 + Math.random() * 0.5); // 增加宽度
+      const height = 20; // 增加高度
+      const geometry = new THREE.PlaneGeometry(width, height);
+
       // 创建光线网格
       const beam = new THREE.Mesh(geometry, beamMaterial);
-      
-      // 设置位置和旋转
-      const tiltAngle = (Math.random() * 10 - 5) * Math.PI / 180; // -5到5度的随机倾斜
-      beam.position.set(x, 10, -1);
+
+      // 设置位置和旋转 - 调整Z位置使其更加可见
+      const tiltAngle = (5 * Math.PI) / 180;
+      beam.position.set(x, 5, 0); // 降低Y位置，调整Z位置到前面
       beam.rotation.z = tiltAngle;
-      
+
       // 添加到场景
       sceneRef.current.add(beam);
       sceneRef.current.userData.sunbeams.push(beam);
+
+      // 为每个主光束创建额外的平面，增强体积感
+      for (let j = 0; j < 2; j++) {
+        const extraBeam = beam.clone();
+        // 轻微偏移位置和角度
+        extraBeam.position.x += (Math.random() - 0.5) * 0.2;
+        extraBeam.position.z += (Math.random() - 0.5) * 0.5;
+        extraBeam.rotation.z += (Math.random() - 0.5) * 0.05;
+
+        // 添加到场景
+        sceneRef.current.add(extraBeam);
+        sceneRef.current.userData.sunbeams.push(extraBeam);
+      }
     }
   };
 
@@ -799,31 +825,41 @@ const DeepSea = () => {
     const directionalLights = sceneRef.current.userData.sunbeams.filter(
       (obj: THREE.Object3D) => obj instanceof THREE.DirectionalLight
     ) as THREE.DirectionalLight[];
-    
+
     // 获取所有光束平面
     const beams = sceneRef.current.userData.sunbeams.filter(
-      (obj: THREE.Object3D) => 
-        obj instanceof THREE.Mesh && 
+      (obj: THREE.Object3D) =>
+        obj instanceof THREE.Mesh &&
         obj.material instanceof THREE.ShaderMaterial
     ) as THREE.Mesh[];
-    
+
     // 更新方向光的强度 - 添加轻微的时间变化
-    directionalLights.forEach((light: THREE.DirectionalLight, index: number) => {
-      if (light) {
-        // 轻微的强度变化
-        const intensityVariation = Math.sin(time * 0.5 + index * 0.7) * 0.1 + 0.9;
-        light.intensity = 0.3 * intensityVariation;
-        
-        // 轻微的位置变化 - 模拟光线摇曳
-        const originalX = Math.sin((index / directionalLights.length) * Math.PI * 0.3 - Math.PI * 0.15) * 5;
-        const wobble = Math.sin(time * 0.3 + index * 1.1) * 0.2;
-        light.position.x = originalX + wobble;
+    directionalLights.forEach(
+      (light: THREE.DirectionalLight, index: number) => {
+        if (light) {
+          // 轻微的强度变化
+          const intensityVariation =
+            Math.sin(time * 0.5 + index * 0.7) * 0.1 + 0.9;
+          light.intensity = 0.3 * intensityVariation;
+
+          // 轻微的位置变化 - 模拟光线摇曳
+          const originalX =
+            Math.sin(
+              (index / directionalLights.length) * Math.PI * 0.3 -
+                Math.PI * 0.15
+            ) * 5;
+          const wobble = Math.sin(time * 0.3 + index * 1.1) * 0.2;
+          light.position.x = originalX + wobble;
+        }
       }
-    });
-    
+    );
+
     // 更新光束平面的着色器时间
     beams.forEach((beam: THREE.Mesh) => {
-      if (beam.material instanceof THREE.ShaderMaterial && beam.material.uniforms.time) {
+      if (
+        beam.material instanceof THREE.ShaderMaterial &&
+        beam.material.uniforms.time
+      ) {
         beam.material.uniforms.time.value = time;
       }
     });
