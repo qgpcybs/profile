@@ -611,9 +611,64 @@ const DeepSea = () => {
       });
     }
 
-    // 光线数量
-    const beamCount = 1; // 间断型分布的光线数量
+    // 重置光线数组
+    if (sceneRef.current) {
+      sceneRef.current.userData.sunbeams = [];
+    }
 
+    // 创建多个方向光，从不同角度照射
+    const lightCount = 5; // 使用多个光源以增强效果
+    
+    for (let i = 0; i < lightCount; i++) {
+      // 创建方向光
+      const directionalLight = new THREE.DirectionalLight(
+        0x80ccff, // 淡蓝色
+        0.3 // 较低的强度，避免过亮
+      );
+      
+      // 计算光线角度 - 主要从上方照射，但有轻微的角度变化
+      const angleOffset = (i / lightCount) * Math.PI * 0.3 - Math.PI * 0.15; // -15度到+15度的范围
+      
+      // 设置光线方向 - 从上方照射下来
+      directionalLight.position.set(
+        Math.sin(angleOffset) * 5, // X轴位置
+        10, // Y轴位置（高处）
+        Math.cos(angleOffset) * 5 // Z轴位置
+      );
+      
+      // 设置目标位置
+      directionalLight.target.position.set(0, -5, 0);
+      
+      // 启用阴影
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 1024;
+      directionalLight.shadow.mapSize.height = 1024;
+      
+      // 设置阴影相机参数
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 20;
+      directionalLight.shadow.camera.left = -10;
+      directionalLight.shadow.camera.right = 10;
+      directionalLight.shadow.camera.top = 10;
+      directionalLight.shadow.camera.bottom = -10;
+      
+      // 添加到场景
+      sceneRef.current.add(directionalLight);
+      sceneRef.current.add(directionalLight.target);
+      
+      // 存储光线引用
+      sceneRef.current.userData.sunbeams = sceneRef.current.userData.sunbeams || [];
+      sceneRef.current.userData.sunbeams.push(directionalLight);
+    }
+    
+    // 添加可视化的光线效果
+    createLightBeams();
+  };
+  
+  // 创建可视化的光线效果
+  const createLightBeams = () => {
+    if (!sceneRef.current) return;
+    
     // 光线顶点着色器
     const beamVertexShader = `
       uniform float time;
@@ -624,7 +679,7 @@ const DeepSea = () => {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `;
-
+    
     // 光线片段着色器 - 创建柔和的光线效果
     const beamFragmentShader = `
       uniform float time;
@@ -695,77 +750,44 @@ const DeepSea = () => {
         gl_FragColor = vec4(finalColor, alpha);
       }
     `;
-
-    // 创建光线
+    
+    // 创建多个光束
+    const beamCount = 8;
+    const totalWidth = 10;
+    const usableWidth = totalWidth * 0.8;
+    const startX = -usableWidth / 2;
+    const beamWidth = usableWidth / beamCount;
+    
     for (let i = 0; i < beamCount; i++) {
-      // 随机位置变化 - 但确保在中间80%区域内
-
-      // 创建聚光灯 - 用于实际照亮场景
-      const spotLight = new THREE.SpotLight(
-        0xffffff, // 白色！
-        0.8, // 强度
-        20, // 距离
-        Math.PI / 5, // 光锥角度 (15度)
-        0.5, // 半影衰减
-        2 // 衰减
-      );
-
-      // 设置位置 - 从上方照射下来
-      spotLight.position.set(0, 5, -2); // 位置更高，更靠前一些
-
-      // 设置目标位置 - 向下照射
-      const targetObject = new THREE.Object3D();
-      targetObject.position.set(0, -5, 2); // 目标位置在下方
-      sceneRef.current.add(targetObject);
-      spotLight.target = targetObject;
-
-      // 设置阴影
-      spotLight.castShadow = true;
-      spotLight.shadow.mapSize.width = 1024;
-      spotLight.shadow.mapSize.height = 1024;
-
-      // 添加到场景
-      sceneRef.current.add(spotLight);
-
-      // 存储光线引用
-      if (!sceneRef.current.userData.sunbeams) {
-        sceneRef.current.userData.sunbeams = [];
-      }
-      sceneRef.current.userData.sunbeams.push(spotLight);
-
-      // 添加可见的光锥
-      const coneLength = 15;
-      const coneWidth = Math.tan(Math.PI / 12) * coneLength;
-      // 创建光锥几何体
-      const coneGeometry = new THREE.ConeGeometry(
-        coneWidth,
-        coneLength,
-        32,
-        1,
-        true
-      );
-
-      const coneMaterial = new THREE.ShaderMaterial({
-        uniforms: { color: { value: 0xffffff }, time: { value: 0.0 } },
+      // 随机位置变化
+      const x = startX + (i + 0.5) * beamWidth + (Math.random() - 0.5) * beamWidth * 0.5;
+      
+      // 创建光线材质
+      const beamMaterial = new THREE.ShaderMaterial({
+        uniforms: { time: { value: 0.0 } },
         vertexShader: beamVertexShader,
         fragmentShader: beamFragmentShader,
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        side: THREE.DoubleSide,
+        side: THREE.DoubleSide
       });
-
-      // 创建光锥网格
-      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-
-      // 设置位置
-      cone.position.copy(spotLight.position);
-
+      
+      // 创建光线几何体 - 使用平面
+      const width = beamWidth * (0.7 + Math.random() * 0.5);
+      const geometry = new THREE.PlaneGeometry(width, 15);
+      
+      // 创建光线网格
+      const beam = new THREE.Mesh(geometry, beamMaterial);
+      
+      // 设置位置和旋转
+      const tiltAngle = (Math.random() * 10 - 5) * Math.PI / 180; // -5到5度的随机倾斜
+      beam.position.set(x, 10, -1);
+      beam.rotation.z = tiltAngle;
+      
       // 添加到场景
-      sceneRef.current.add(cone);
-
-      // 也将光锥添加到光线引用中
-      sceneRef.current.userData.sunbeams.push(cone);
+      sceneRef.current.add(beam);
+      sceneRef.current.userData.sunbeams.push(beam);
     }
   };
 
@@ -773,29 +795,36 @@ const DeepSea = () => {
   const updateSunbeams = (time: number) => {
     if (!sceneRef.current || !sceneRef.current.userData.sunbeams) return;
 
-    // 获取所有聚光灯
-    const spotLights = sceneRef.current.userData.sunbeams.filter(
-      (obj: THREE.Object3D) => obj instanceof THREE.SpotLight
-    ) as THREE.SpotLight[];
-
-    // 获取所有光锥
-    const cones = sceneRef.current.userData.sunbeams.filter(
-      (obj: THREE.Object3D) =>
-        obj instanceof THREE.Mesh && obj.geometry instanceof THREE.ConeGeometry
+    // 获取所有方向光
+    const directionalLights = sceneRef.current.userData.sunbeams.filter(
+      (obj: THREE.Object3D) => obj instanceof THREE.DirectionalLight
+    ) as THREE.DirectionalLight[];
+    
+    // 获取所有光束平面
+    const beams = sceneRef.current.userData.sunbeams.filter(
+      (obj: THREE.Object3D) => 
+        obj instanceof THREE.Mesh && 
+        obj.material instanceof THREE.ShaderMaterial
     ) as THREE.Mesh[];
-
-    // 更新聚光灯的强度 - 添加轻微的时间变化
-    spotLights.forEach((light: THREE.SpotLight, index: number) => {
+    
+    // 更新方向光的强度 - 添加轻微的时间变化
+    directionalLights.forEach((light: THREE.DirectionalLight, index: number) => {
       if (light) {
         // 轻微的强度变化
-        const intensityVariation =
-          Math.sin(time * 0.5 + index * 0.7) * 0.1 + 0.9;
-        light.intensity = 0.8 * intensityVariation;
-
-        // 更新光锥位置
-        if (cones[index]) {
-          cones[index].position.x = light.position.x;
-        }
+        const intensityVariation = Math.sin(time * 0.5 + index * 0.7) * 0.1 + 0.9;
+        light.intensity = 0.3 * intensityVariation;
+        
+        // 轻微的位置变化 - 模拟光线摇曳
+        const originalX = Math.sin((index / directionalLights.length) * Math.PI * 0.3 - Math.PI * 0.15) * 5;
+        const wobble = Math.sin(time * 0.3 + index * 1.1) * 0.2;
+        light.position.x = originalX + wobble;
+      }
+    });
+    
+    // 更新光束平面的着色器时间
+    beams.forEach((beam: THREE.Mesh) => {
+      if (beam.material instanceof THREE.ShaderMaterial && beam.material.uniforms.time) {
+        beam.material.uniforms.time.value = time;
       }
     });
   };
