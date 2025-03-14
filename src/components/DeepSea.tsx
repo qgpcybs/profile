@@ -73,97 +73,6 @@ const DeepSea = () => {
     startAnimation();
   };
 
-  /* 
-  // 创建深海背景 - 用户已注释掉，因为"深海背景太丑了"
-  const createDeepSeaBackground = () => {
-    if (!sceneRef.current) return;
-
-    // 创建深海背景 - 使用渐变着色器材质
-    const vertexShader = `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `;
-
-    const fragmentShader = `
-      uniform float time;
-      varying vec2 vUv;
-      
-      // 噪声函数
-      vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-      vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-      vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-      
-      float snoise(vec2 v) {
-        const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
-        vec2 i  = floor(v + dot(v, C.yy));
-        vec2 x0 = v - i + dot(i, C.xx);
-        vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-        vec4 x12 = x0.xyxy + C.xxzz;
-        x12.xy -= i1;
-        i = mod289(i);
-        vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-        vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-        m = m*m;
-        m = m*m;
-        vec3 x = 2.0 * fract(p * C.www) - 1.0;
-        vec3 h = abs(x) - 0.5;
-        vec3 ox = floor(x + 0.5);
-        vec3 a0 = x - ox;
-        m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-        vec3 g;
-        g.x = a0.x * x0.x + h.x * x0.y;
-        g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-        return 130.0 * dot(m, g);
-      }
-      
-      void main() {
-        // 深海渐变色 - 从深黑到深蓝
-        vec3 deepBlack = vec3(0.0, 0.0, 0.02);
-        vec3 deepBlue = vec3(0.0, 0.05, 0.1);
-        
-        // 使用噪声创建流动效果
-        float noise = snoise(vUv * 3.0 + time * 0.1) * 0.1;
-        
-        // 从底部到顶部的渐变
-        float gradient = vUv.y + noise;
-        
-        // 混合颜色
-        vec3 color = mix(deepBlack, deepBlue, gradient);
-        
-        // 添加一些随机的"暗流"效果
-        float flowNoise = snoise(vUv * 5.0 + time * 0.2) * 0.05;
-        color += flowNoise;
-        
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `;
-
-    // 创建着色器材质
-    const uniforms = {
-      time: { value: 0.0 },
-    };
-
-    const material = new THREE.ShaderMaterial({
-      uniforms: uniforms,
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-    });
-
-    // 创建一个覆盖整个视图的平面
-    const geometry = new THREE.PlaneGeometry(20, 20);
-    const background = new THREE.Mesh(geometry, material);
-    background.position.z = -10;
-    sceneRef.current.add(background);
-
-    // 存储背景引用以便在动画循环中更新
-    sceneRef.current.userData.background = background;
-    sceneRef.current.userData.backgroundUniforms = uniforms;
-  };
-  */
-
   // 创建气泡
   const createBubbles = () => {
     if (!sceneRef.current) return;
@@ -336,46 +245,47 @@ const DeepSea = () => {
         bubble.userData.uniforms.time.value = time;
       }
     });
-    
+
     // 更新缓慢上升的球形气泡
     slowBubblesRef.current.forEach((bubble) => {
       if (!bubble.userData.active || bubble.userData.bursting) return; // 跳过非活跃或正在爆开的气泡
-      
+
       bubble.userData.age += 0.016; // 大约每帧增加16毫秒
-      
+
       // 缓慢上升
       bubble.position.y += bubble.userData.speed;
-      
+
       // 非常轻微的左右摆动 - 更自然的效果
       bubble.position.x +=
         Math.sin(time * bubble.userData.wobbleSpeed) *
         bubble.userData.wobbleAmount *
         0.02; // 比快速气泡更轻微的摆动
-      
+
       // 随机爆开的概率 - 随着年龄增加而增加
-      const burstChance = (bubble.userData.age / bubble.userData.lifespan) * 0.01;
-      
+      const burstChance =
+        (bubble.userData.age / bubble.userData.lifespan) * 0.01;
+
       // 决定是否爆开气泡
-      const shouldBurst = 
-        (bubble.position.y > 5) || // 到达顶部
-        (Math.random() < burstChance); // 随机爆开
-      
+      const shouldBurst =
+        bubble.position.y > 5 || // 到达顶部
+        Math.random() < burstChance; // 随机爆开
+
       if (shouldBurst && !bubble.userData.bursting) {
         // 标记为正在爆开
         bubble.userData.bursting = true;
-        
+
         // 爆开动画 - 先短暂放大然后迅速缩小并淡出
         const originalScale = bubble.scale.x;
-        
+
         // 轻微放大
         gsap.to(bubble.scale, {
           x: originalScale * 1.1,
           y: originalScale * 1.1,
           z: originalScale * 1.1,
           duration: 0.2,
-          ease: "power1.out"
+          ease: "power1.out",
         });
-        
+
         // 同时处理材质的透明度
         if (bubble.material instanceof THREE.Material) {
           gsap.to(bubble.material, {
@@ -387,7 +297,7 @@ const DeepSea = () => {
               createBubbleFragments(bubble);
               // 重置气泡
               resetSlowBubble(bubble);
-            }
+            },
           });
         } else {
           // 如果材质不是单个材质，直接重置气泡
@@ -396,47 +306,47 @@ const DeepSea = () => {
           }, 200);
         }
       }
-      
+
       // 更新着色器时间
       if (bubble.userData.uniforms && bubble.userData.uniforms.time) {
         bubble.userData.uniforms.time.value = time;
       }
     });
-    
+
     // 更新光线效果
     updateSunbeams(time);
-    
+
     // 重置缓慢气泡的函数
     function resetSlowBubble(bubble: THREE.Mesh) {
       // 重置位置
       bubble.position.y = -2.5;
       bubble.position.x = (Math.random() - 0.5) * 8;
       bubble.position.z = Math.random() * 3 - 1.5;
-      
+
       // 重置大小
       bubble.scale.set(1, 1, 1);
-      
+
       // 重置状态
       bubble.userData.active = true;
       bubble.userData.bursting = false;
       bubble.userData.age = 0;
-      
+
       // 随机新的生命周期和爆开概率
       bubble.userData.lifespan = Math.random() * 20 + 10;
-      
+
       // 随机新的速度和摆动参数
       bubble.userData.speed = Math.random() * 0.005 + 0.002;
       bubble.userData.wobbleSpeed = Math.random() * 0.05 + 0.02;
       bubble.userData.wobbleAmount = Math.random() * 0.1 + 0.05;
-      
+
       // 淡入效果
       if (bubble.material instanceof THREE.Material) {
         bubble.material.opacity = 0;
         gsap.to(bubble.material, {
-          opacity: 1,
+          opacity: 0.5,
           duration: 1,
           ease: "power1.in",
-          delay: Math.random() * 0.5
+          delay: Math.random() * 0.5,
         });
       }
     }
@@ -495,291 +405,154 @@ const DeepSea = () => {
   const createSlowBubbles = () => {
     if (!sceneRef.current || slowBubblesCreatedRef.current) return;
     slowBubblesCreatedRef.current = true;
-    
+
     console.log("创建缓慢上升的球形气泡");
-    
+
     // 气泡数量 - 稀疏分布
     const bubbleCount = 30;
-    
-    // 气泡顶点着色器 - 更真实的气泡变形
-    const bubbleVertexShader = `
-      uniform float time;
-      varying vec2 vUv;
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      varying vec3 vViewPosition;
-      
-      // 噪声函数
-      float noise(vec3 p) {
-        return fract(sin(dot(p, vec3(12.9898, 78.233, 45.5432))) * 43758.5453);
-      }
-      
-      // 柏林噪声简化版
-      float pnoise(vec3 p) {
-        vec3 i = floor(p);
-        vec3 f = fract(p);
-        f = f * f * (3.0 - 2.0 * f); // 平滑插值
-        
-        float n = mix(
-          mix(
-            mix(noise(i), noise(i + vec3(1.0, 0.0, 0.0)), f.x),
-            mix(noise(i + vec3(0.0, 1.0, 0.0)), noise(i + vec3(1.0, 1.0, 0.0)), f.x),
-            f.y
-          ),
-          mix(
-            mix(noise(i + vec3(0.0, 0.0, 1.0)), noise(i + vec3(1.0, 0.0, 1.0)), f.x),
-            mix(noise(i + vec3(0.0, 1.0, 1.0)), noise(i + vec3(1.0, 1.0, 1.0)), f.x),
-            f.y
-          ),
-          f.z
-        );
-        
-        return n * 2.0 - 1.0;
-      }
-      
-      void main() {
-        vUv = uv;
-        vNormal = normal;
-        vPosition = position;
-        
-        // 更复杂的变形效果，模拟真实气泡的不规则性
-        float noiseScale = 2.0;
-        float noiseTime = time * 0.3;
-        
-        // 使用多层噪声创建更自然的变形
-        float noise1 = pnoise(vec3(position.x * noiseScale, position.y * noiseScale, noiseTime)) * 0.02;
-        float noise2 = pnoise(vec3(position.z * noiseScale, position.x * noiseScale, noiseTime * 0.7)) * 0.02;
-        float noise3 = pnoise(vec3(position.y * noiseScale, position.z * noiseScale, noiseTime * 1.3)) * 0.02;
-        
-        // 组合噪声
-        float combinedNoise = noise1 + noise2 + noise3;
-        
-        // 应用变形到顶点，保持整体球形但有微小的不规则性
-        vec3 newPosition = position + normal * combinedNoise;
-        
-        // 计算视图空间位置用于片段着色器中的效果
-        vec4 mvPosition = modelViewMatrix * vec4(newPosition, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        
-        gl_Position = projectionMatrix * mvPosition;
-      }
-    `;
-    
-    // 气泡片段着色器 - 更真实的气泡光学效果
-    const bubbleFragmentShader = `
-      uniform float time;
-      varying vec2 vUv;
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      varying vec3 vViewPosition;
-      
-      // 噪声函数
-      float noise(vec2 p) {
-        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-      }
-      
-      void main() {
-        // 视线方向
-        vec3 viewDir = normalize(vViewPosition);
-        
-        // 增强的菲涅尔效果 - 使边缘更亮，中心更透明
-        float fresnel = pow(1.0 - abs(dot(normalize(vNormal), viewDir)), 5.0);
-        
-        // 单一主光源 - 从左上方照射
-        vec3 lightDir = normalize(vec3(-0.5, 0.8, 0.3));
-        
-        // 创建单一的椭圆形光斑
-        float specular = 0.0;
-        
-        // 计算反射向量
-        vec3 reflectDir = reflect(-lightDir, normalize(vNormal));
-        float reflectDot = dot(reflectDir, viewDir);
-        
-        // 创建椭圆形光斑 - 使用非对称的指数
-        if (reflectDot > 0.0) {
-          // 基本高光
-          specular = pow(reflectDot, 32.0);
-          
-          // 使光斑呈椭圆形 - 根据法线和光源方向调整
-          vec3 halfVec = normalize(lightDir + viewDir);
-          float NdotH = max(dot(normalize(vNormal), halfVec), 0.0);
-          
-          // 椭圆形状调整
-          float elongation = 1.5; // 椭圆拉伸系数
-          specular *= pow(NdotH, 8.0) * elongation;
-          
-          // 确保光斑强度适中
-          specular = min(specular * 0.7, 0.7);
-        }
-        
-        // 基础气泡颜色 - 非常淡的蓝色
-        vec3 bubbleColor = vec3(0.2, 0.4, 0.7);
-        
-        // 添加一些随机的色彩变化 - 减少随机性使气泡更均匀
-        float colorNoise = noise(vUv * 3.0 + time * 0.05) * 0.02;
-        bubbleColor += vec3(colorNoise);
-        
-        // 非常轻微的彩虹效果 - 模拟光的色散
-        vec3 rainbow = 0.5 + 0.5 * cos(time * 0.05 + vUv.xyx + vec3(0, 2, 4));
-        
-        // 最终颜色 - 结合所有效果
-        vec3 finalColor = mix(bubbleColor, rainbow, 0.01); // 减少彩虹效果
-        finalColor += vec3(1.0, 1.0, 1.0) * specular; // 添加单一光斑
-        finalColor += vec3(0.3, 0.5, 0.9) * fresnel * 0.4; // 添加边缘光
-        
-        // 透明度 - 中心更透明，边缘更不透明
-        float alpha = 0.15 + fresnel * 0.2;
-        
-        gl_FragColor = vec4(finalColor, alpha);
-      }
-    `;
-    
-    // 气泡材质
-    const bubbleUniforms = {
-      time: { value: 0.0 }
-    };
-    
-    // 使用着色器材质创建动态气泡
-    const bubbleMaterial = new THREE.ShaderMaterial({
-      uniforms: bubbleUniforms,
-      vertexShader: bubbleVertexShader,
-      fragmentShader: bubbleFragmentShader,
-      transparent: true,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending, // 使用加法混合增强光效
-    });
-    
+
     // 创建多个气泡
     for (let i = 0; i < bubbleCount; i++) {
       // 随机大小 - 比之前更小
       const size = Math.random() * 0.01 + 0.03; // 最大值缩小2倍
-      
+
       // 使用球体作为基础形状 - 更高的分段数使其更圆滑
       const geometry = new THREE.SphereGeometry(size, 48, 48);
-      
+
+      // 创建气泡材质 - 使用MeshPhysicalMaterial以支持实时光照
+      const material = new THREE.MeshPhysicalMaterial({
+        color: 0xdbf1ff, // 淡蓝色
+        transparent: true,
+        opacity: 0.5, // 非常透明
+        transmission: 0.97, // 高透射率
+        roughness: 0.1, // 非常光滑
+        metalness: 0.0, // 轻微金属感
+        clearcoat: 0.5, // 最大清漆效果
+        clearcoatRoughness: 0.1, // 光滑的清漆
+        ior: 1.5, // 玻璃的折射率
+        side: THREE.DoubleSide,
+      });
+
       // 创建气泡网格
-      const material = bubbleMaterial.clone();
       const bubble = new THREE.Mesh(geometry, material);
-      
-      // 确保每个气泡的材质都有自己的uniforms
-      if (material instanceof THREE.ShaderMaterial) {
-        bubble.userData.uniforms = material.uniforms;
-      }
-      
+
       // 随机位置 - 更均匀分布
       bubble.position.x = (Math.random() - 0.5) * 8;
       bubble.position.y = -2.5;
       bubble.position.z = Math.random() * 3 - 1.5;
-      
+
       // 随机速度 - 非常缓慢上升
       bubble.userData.speed = Math.random() * 0.005 + 0.002;
-      
+
       // 随机摆动参数 - 更自然的摆动
       bubble.userData.wobbleSpeed = Math.random() * 0.05 + 0.02; // 非常缓慢的摆动
       bubble.userData.wobbleAmount = Math.random() * 0.1 + 0.05; // 轻微的摆动幅度
-      
+
       // 随机生命周期 - 有些气泡会在上升过程中爆开
       bubble.userData.lifespan = Math.random() * 20 + 10; // 10-30秒的生命周期
       bubble.userData.age = 0; // 当前年龄
-      
+
       // 标记为活跃状态
       bubble.userData.active = true;
       bubble.userData.isSlowBubble = true; // 标记为缓慢气泡
       bubble.userData.bursting = false; // 标记是否正在爆开
-      
+
       // 添加到场景
       sceneRef.current.add(bubble);
       slowBubblesRef.current.push(bubble);
-      
+
       // 创建时间
       bubble.userData.creationTime = performance.now() * 0.001;
-      
+
       // 初始时完全透明，然后淡入
-      bubble.material.opacity = 1;
-      // gsap.to(bubble.material, {
-      //   opacity: 1,
-      //   duration: 2,
-      //   ease: "power1.inOut",
-      //   delay: Math.random() * 2
-      // });
+      material.opacity = 0;
+      gsap.to(material, {
+        opacity: 0.5,
+        duration: 1,
+        ease: "power1.in",
+        delay: Math.random() * 0.5,
+      });
     }
   };
 
   // 创建气泡爆开的碎片效果
   const createBubbleFragments = (bubble: THREE.Mesh) => {
     if (!sceneRef.current) return;
-    
+
     // 碎片数量
     const fragmentCount = 3 + Math.floor(Math.random() * 3); // 3-5个碎片
-    
+
     // 获取气泡的位置和大小
     const position = bubble.position.clone();
-    const bubbleSize = (bubble.geometry as THREE.SphereGeometry).parameters.radius;
-    
+    const bubbleSize = (bubble.geometry as THREE.SphereGeometry).parameters
+      .radius;
+
     // 获取气泡的材质属性
     const bubbleColor = new THREE.Color(0x80c0ff);
     // 可以从原气泡材质中获取更多属性，但目前不需要
-    
+
     // 创建碎片
     for (let i = 0; i < fragmentCount; i++) {
       // 随机大小 - 比原气泡小很多
       const fragmentSize = bubbleSize * (0.15 + Math.random() * 0.2);
-      
+
       // 创建碎片几何体 - 使用小球体而不是平面，更像小水滴
       const geometry = new THREE.SphereGeometry(fragmentSize, 8, 8);
-      
+
       // 创建碎片材质 - 使用与气泡相似的材质
       const material = new THREE.MeshPhongMaterial({
         color: bubbleColor,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.5,
         shininess: 100,
         specular: 0xffffff,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
       });
-      
+
       // 创建碎片网格
       const fragment = new THREE.Mesh(geometry, material);
-      
+
       // 设置初始位置 - 与气泡位置相同，但有微小偏移
-      fragment.position.copy(position).add(
-        new THREE.Vector3(
-          (Math.random() - 0.5) * 0.05,
-          (Math.random() - 0.5) * 0.05,
-          (Math.random() - 0.5) * 0.05
-        )
-      );
-      
+      fragment.position
+        .copy(position)
+        .add(
+          new THREE.Vector3(
+            (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.05
+          )
+        );
+
       // 添加到场景
       sceneRef.current.add(fragment);
-      
+
       // 随机方向 - 向外扩散
       const direction = new THREE.Vector3(
         (Math.random() - 0.5) * 2,
         Math.random() * 0.5 + 0.5, // 偏向上方
         (Math.random() - 0.5) * 2
       ).normalize();
-      
+
       // 动画 - 向外扩散并淡出
       const distance = 0.1 + Math.random() * 0.1; // 随机扩散距离
-      
+
       gsap.to(fragment.position, {
         x: position.x + direction.x * distance,
         y: position.y + direction.y * distance,
         z: position.z + direction.z * distance,
         duration: 0.2 + Math.random() * 0.1, // 随机持续时间
-        ease: "power1.out"
+        ease: "power1.out",
       });
-      
+
       // 同时缩小并淡出
       gsap.to(fragment.scale, {
         x: 0.1,
         y: 0.1,
         z: 0.1,
         duration: 0.2 + Math.random() * 0.1,
-        ease: "power1.in"
+        ease: "power1.in",
       });
-      
+
       gsap.to(material, {
         opacity: 0,
         duration: 0.2 + Math.random() * 0.1,
@@ -792,11 +565,11 @@ const DeepSea = () => {
           // 释放资源
           geometry.dispose();
           material.dispose();
-        }
+        },
       });
     }
   };
-  
+
   // 从黑色背景过渡到深海背景
   const transitionToDeepSea = () => {
     if (!sceneRef.current) return;
@@ -809,11 +582,9 @@ const DeepSea = () => {
       b: 0.05,
       ease: "power2.inOut",
       onComplete: () => {
-        console.log("Transition to deep sea complete");
+        createSunbeams(); // 创建自上而下的光芒效果
         // 在背景过渡完成后创建缓慢上升的球形气泡
         createSlowBubbles();
-        // 创建自上而下的光芒效果
-        createSunbeams();
       },
     });
 
@@ -828,12 +599,21 @@ const DeepSea = () => {
   // 创建自上而下的光芒效果
   const createSunbeams = () => {
     if (!sceneRef.current) return;
-    
+
     console.log("创建自上而下的光芒效果");
-    
+
+    // 清除之前的光线
+    if (sceneRef.current.userData.sunbeams) {
+      sceneRef.current.userData.sunbeams.forEach((light: THREE.Object3D) => {
+        if (sceneRef.current) {
+          sceneRef.current.remove(light);
+        }
+      });
+    }
+
     // 光线数量
-    const beamCount = 8; // 间断型分布的光线数量
-    
+    const beamCount = 1; // 间断型分布的光线数量
+
     // 光线顶点着色器
     const beamVertexShader = `
       uniform float time;
@@ -844,8 +624,8 @@ const DeepSea = () => {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `;
-    
-    // 光线片段着色器
+
+    // 光线片段着色器 - 创建柔和的光线效果
     const beamFragmentShader = `
       uniform float time;
       varying vec2 vUv;
@@ -888,106 +668,138 @@ const DeepSea = () => {
         // 基础光线颜色 - 淡蓝色
         vec3 beamColor = vec3(0.6, 0.8, 1.0);
         
-        // 使用噪声创建光线强度变化 - 降低频率使过渡更平滑
+        // 使用噪声创建光线强度变化
         float noiseValue = fbm(vec2(vUv.x * 0.4, vUv.y * 0.5 + time * 0.05));
         
         // 光线强度随时间变化
         float timeVariation = sin(time * 0.2 + vUv.y * 5.0) * 0.5 + 0.5;
         
         // 光线从上到下逐渐变淡
-        float bottomFadeStart = 0.25; 
-        float verticalFade = smoothstep(0.0, bottomFadeStart, vUv.y);
+        float verticalFade = smoothstep(0.0, 0.3, vUv.y);
         verticalFade = pow(verticalFade, 1.5);
         
         // 光线在水平方向上的衰减 - 使用更平滑的过渡减少线条感
-        // 使用更大的过渡区域
         float horizontalFade = smoothstep(0.0, 0.4, vUv.x) * smoothstep(1.0, 0.6, vUv.x);
         
-        // 添加一些随机的光线变化 - 降低影响使光线更柔和
+        // 添加一些随机的光线变化
         float randomVariation = noise(vec2(vUv.y * 10.0 + time * 0.1, time * 0.2));
         
         // 组合所有效果
-        float intensity = verticalFade * horizontalFade * (noiseValue * 0.8 + 0.2) * (timeVariation * 0.2 + 0.8) * (randomVariation * 0.15 + 0.85);
+        float intensity = verticalFade * horizontalFade * (noiseValue * 0.8 + 0.2) * 
+                         (timeVariation * 0.2 + 0.8) * (randomVariation * 0.15 + 0.85);
         
         // 最终颜色和透明度
         vec3 finalColor = beamColor * intensity;
-        float alpha = intensity * 0.2; // 降低整体透明度使效果更柔和
+        float alpha = intensity * 0.3; // 调整整体透明度
         
         gl_FragColor = vec4(finalColor, alpha);
       }
     `;
-    
-    // 光线材质
-    const beamUniforms = {
-      time: { value: 0.0 }
-    };
-    
-    // 使用着色器材质创建光线
-    const beamMaterial = new THREE.ShaderMaterial({
-      uniforms: beamUniforms,
-      vertexShader: beamVertexShader,
-      fragmentShader: beamFragmentShader,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide
-    });
-    
-    // 创建多个光线平面，覆盖屏幕中间80%的区域
-    const totalWidth = 10; // 场景宽度
-    const usableWidth = totalWidth * 0.8; // 可用宽度（80%）
-    const startX = -usableWidth / 2; // 起始X坐标
-    const beamWidth = usableWidth / beamCount; // 每个光束的宽度
-    
+
+    // 创建光线
     for (let i = 0; i < beamCount; i++) {
-      // 随机宽度变化 - 增加宽度使光线更柔和
-      const width = beamWidth * (0.7 + Math.random() * 1.0);
-      
       // 随机位置变化 - 但确保在中间80%区域内
-      const x = startX + (i + 0.5) * beamWidth + (Math.random() - 0.5) * beamWidth * 0.5;
-      
-      // 创建光线几何体 - 高度足够覆盖整个场景
-      const geometry = new THREE.PlaneGeometry(width, 15);
-      
-      // 创建光线网格
-      const material = beamMaterial.clone();
-      const beam = new THREE.Mesh(geometry, material);
-      
-      // 确保每个光线的材质都有自己的uniforms
-      if (material instanceof THREE.ShaderMaterial) {
-        beam.userData.uniforms = material.uniforms;
-      }
-      
+
+      // 创建聚光灯 - 用于实际照亮场景
+      const spotLight = new THREE.SpotLight(
+        0xffffff, // 白色！
+        0.8, // 强度
+        20, // 距离
+        Math.PI / 5, // 光锥角度 (15度)
+        0.5, // 半影衰减
+        2 // 衰减
+      );
+
       // 设置位置 - 从上方照射下来
-      beam.position.set(x, 5, -1); // 放在气泡后面
-      
-      // 5度倾斜
-      const tiltAngle = 5 * Math.PI / 180;
-      beam.rotation.z = tiltAngle;
-      
+      spotLight.position.set(0, 5, -2); // 位置更高，更靠前一些
+
+      // 设置目标位置 - 向下照射
+      const targetObject = new THREE.Object3D();
+      targetObject.position.set(0, -5, 2); // 目标位置在下方
+      sceneRef.current.add(targetObject);
+      spotLight.target = targetObject;
+
+      // 设置阴影
+      spotLight.castShadow = true;
+      spotLight.shadow.mapSize.width = 1024;
+      spotLight.shadow.mapSize.height = 1024;
+
       // 添加到场景
-      sceneRef.current.add(beam);
-      
+      sceneRef.current.add(spotLight);
+
       // 存储光线引用
       if (!sceneRef.current.userData.sunbeams) {
         sceneRef.current.userData.sunbeams = [];
       }
-      sceneRef.current.userData.sunbeams.push(beam);
+      sceneRef.current.userData.sunbeams.push(spotLight);
+
+      // 添加可见的光锥
+      const coneLength = 15;
+      const coneWidth = Math.tan(Math.PI / 12) * coneLength;
+      // 创建光锥几何体
+      const coneGeometry = new THREE.ConeGeometry(
+        coneWidth,
+        coneLength,
+        32,
+        1,
+        true
+      );
+
+      const coneMaterial = new THREE.ShaderMaterial({
+        uniforms: { color: { value: 0xffffff }, time: { value: 0.0 } },
+        vertexShader: beamVertexShader,
+        fragmentShader: beamFragmentShader,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      // 创建光锥网格
+      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+
+      // 设置位置
+      cone.position.copy(spotLight.position);
+
+      // 添加到场景
+      sceneRef.current.add(cone);
+
+      // 也将光锥添加到光线引用中
+      sceneRef.current.userData.sunbeams.push(cone);
     }
   };
-  
+
   // 在动画循环中更新光线效果
   const updateSunbeams = (time: number) => {
     if (!sceneRef.current || !sceneRef.current.userData.sunbeams) return;
-    
-    // 更新所有光线的时间参数
-    sceneRef.current.userData.sunbeams.forEach((beam: THREE.Mesh) => {
-      if (beam.userData.uniforms && beam.userData.uniforms.time) {
-        beam.userData.uniforms.time.value = time;
+
+    // 获取所有聚光灯
+    const spotLights = sceneRef.current.userData.sunbeams.filter(
+      (obj: THREE.Object3D) => obj instanceof THREE.SpotLight
+    ) as THREE.SpotLight[];
+
+    // 获取所有光锥
+    const cones = sceneRef.current.userData.sunbeams.filter(
+      (obj: THREE.Object3D) =>
+        obj instanceof THREE.Mesh && obj.geometry instanceof THREE.ConeGeometry
+    ) as THREE.Mesh[];
+
+    // 更新聚光灯的强度 - 添加轻微的时间变化
+    spotLights.forEach((light: THREE.SpotLight, index: number) => {
+      if (light) {
+        // 轻微的强度变化
+        const intensityVariation =
+          Math.sin(time * 0.5 + index * 0.7) * 0.1 + 0.9;
+        light.intensity = 0.8 * intensityVariation;
+
+        // 更新光锥位置
+        if (cones[index]) {
+          cones[index].position.x = light.position.x;
+        }
       }
     });
   };
-  
+
   // 组件挂载时初始化
   useEffect(() => {
     const container = containerRef.current;
