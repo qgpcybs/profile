@@ -71,7 +71,8 @@ const DeepSea = () => {
     startAnimation();
   };
 
-  // 创建深海背景
+  /* 
+  // 创建深海背景 - 用户已注释掉，因为"深海背景太丑了"
   const createDeepSeaBackground = () => {
     if (!sceneRef.current) return;
 
@@ -159,6 +160,7 @@ const DeepSea = () => {
     sceneRef.current.userData.background = background;
     sceneRef.current.userData.backgroundUniforms = uniforms;
   };
+  */
 
   // 创建气泡
   const createBubbles = () => {
@@ -166,8 +168,11 @@ const DeepSea = () => {
 
     console.log("创建气泡");
 
-    // 气泡数量
-    const bubbleCount = 50;
+    // 气泡数量 - 初始阶段更多气泡
+    const bubbleCount = 150; // 增加气泡数量，使初始效果更密集
+    
+    // 记录开始时间
+    startTimeRef.current = performance.now() * 0.001;
 
     // 不再需要简单材质，直接使用着色器材质
 
@@ -260,10 +265,21 @@ const DeepSea = () => {
       bubble.position.y = -5 - Math.random() * 10; // 屏幕底部以下
       bubble.position.z = Math.random() * 5 - 2.5;
 
-      // 随机速度
-      bubble.userData.speed = Math.random() * 0.03 + 0.01;
-      bubble.userData.wobbleSpeed = Math.random() * 0.02 + 0.01;
-      bubble.userData.wobbleAmount = Math.random() * 0.2 + 0.1;
+      // 随机速度 - 初始阶段更快
+      bubble.userData.initialSpeed = Math.random() * 0.08 + 0.04; // 初始速度更快
+      bubble.userData.finalSpeed = Math.random() * 0.02 + 0.005; // 最终速度更慢
+      bubble.userData.speed = bubble.userData.initialSpeed; // 当前速度
+      
+      bubble.userData.initialWobbleSpeed = Math.random() * 0.05 + 0.02; // 初始摆动速度更快
+      bubble.userData.finalWobbleSpeed = Math.random() * 0.01 + 0.005; // 最终摆动速度更慢
+      bubble.userData.wobbleSpeed = bubble.userData.initialWobbleSpeed; // 当前摆动速度
+      
+      bubble.userData.initialWobbleAmount = Math.random() * 0.4 + 0.2; // 初始摆动幅度更大
+      bubble.userData.finalWobbleAmount = Math.random() * 0.1 + 0.05; // 最终摆动幅度更小
+      bubble.userData.wobbleAmount = bubble.userData.initialWobbleAmount; // 当前摆动幅度
+      
+      // 标记为活跃状态
+      bubble.userData.active = true;
 
       // 添加到场景
       sceneRef.current.add(bubble);
@@ -280,6 +296,14 @@ const DeepSea = () => {
     if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
 
     const time = performance.now() * 0.001;
+    // 不再需要计算elapsedTime，因为我们在transitionToDeepSea的onComplete中调用了transitionToSlowBubbles
+    // const elapsedTime = time - startTimeRef.current;
+    
+    // 检查是否过了3秒，如果是，开始过渡到慢速状态
+    // 注释掉这部分，因为我们已经在transitionToDeepSea的onComplete中调用了transitionToSlowBubbles
+    // if (elapsedTime >= 3 && !transitionCompleteRef.current) {
+    //   transitionToSlowBubbles();
+    // }
 
     // 更新背景着色器的时间
     if (sceneRef.current.userData.backgroundUniforms) {
@@ -288,6 +312,8 @@ const DeepSea = () => {
 
     // 更新气泡位置和形状
     bubblesRef.current.forEach((bubble) => {
+      if (!bubble.userData.active) return; // 跳过非活跃气泡
+      
       // 上升
       bubble.position.y += bubble.userData.speed;
 
@@ -301,6 +327,12 @@ const DeepSea = () => {
       if (bubble.position.y > 5) {
         bubble.position.y = -5 - Math.random() * 5;
         bubble.position.x = (Math.random() - 0.5) * 10;
+        
+        // 如果已经过渡完成，有一定概率不再显示气泡（使气泡变得稀疏）
+        if (transitionCompleteRef.current && Math.random() > 0.7) {
+          bubble.userData.active = false;
+          bubble.visible = false;
+        }
       }
 
       // 更新着色器时间 - 使用存储在userData中的uniforms引用
@@ -314,6 +346,26 @@ const DeepSea = () => {
 
     // 继续动画循环
     animationFrameRef.current = requestAnimationFrame(animate);
+  };
+  
+  // 过渡到慢速气泡状态
+  const transitionToSlowBubbles = () => {
+    if (transitionCompleteRef.current) return;
+    transitionCompleteRef.current = true;
+    
+    console.log("过渡到慢速气泡状态");
+    
+    // 为每个气泡创建过渡动画
+    bubblesRef.current.forEach((bubble) => {
+      // 使用GSAP创建平滑过渡
+      gsap.to(bubble.userData, {
+        speed: bubble.userData.finalSpeed,
+        wobbleSpeed: bubble.userData.finalWobbleSpeed,
+        wobbleAmount: bubble.userData.finalWobbleAmount,
+        duration: 1.5,
+        ease: "power2.inOut"
+      });
+    });
   };
 
   // 开始动画
@@ -347,6 +399,8 @@ const DeepSea = () => {
       ease: "power2.inOut",
       onComplete: () => {
         console.log("Transition to deep sea complete");
+        // 在背景过渡完成后，触发气泡过渡
+        transitionToSlowBubbles();
       },
     });
   };
