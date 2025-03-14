@@ -9,9 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/three": "^0.174.0",
+    "gsap": "^3.12.7",
     "next": "15.2.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "^0.174.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
